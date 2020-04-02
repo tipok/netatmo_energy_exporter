@@ -35,10 +35,10 @@ func (c *Client) GetHomes() (*Homes, error) {
 		return nil, fmt.Errorf("could not get homes data: %w", err)
 	}
 
-	var homes []Home
+	var homes []*Home
 	for _, home := range homesData.Homes {
 		if homesStatus, err1 := c.GetHomeStatus(home.Id); err1 == nil {
-			home.Merge(&homesStatus.Home)
+			home.Merge(homesStatus.Home)
 		} else {
 			log.Printf("Error during get home status: %v\n", err1)
 			continue
@@ -91,15 +91,15 @@ func (c *Client) getRoomMeasure(home string, room string) (interface{}, error) {
 	return v, nil
 }
 
-func (c *Client) GetMeasure(bridge string, module string) (*ModuleMeasures, error) {
+func (c *Client) GetMeasure(m *Module) (*ModuleMeasures, error) {
 	measureUrl, err := url.Parse(measure.String())
 	if err != nil {
 		return nil, err
 	}
 
 	q := measureUrl.Query()
-	q.Add("device_id", bridge)
-	q.Add("module_id", module)
+	q.Add("device_id", m.Bridge)
+	q.Add("module_id", m.Id)
 	q.Add("type", "sum_boiler_on,sum_boiler_off,temperature,sp_temperature")
 	q.Add("scale", "5min")
 	q.Add("real_time", "true")
@@ -119,10 +119,10 @@ func (c *Client) GetMeasure(bridge string, module string) (*ModuleMeasures, erro
 	return &ModuleMeasures{Measures: mps}, nil
 }
 
-func parseModuleMeasurePoints(objmap []map[string]*json.RawMessage) []ModuleMeasurePoint {
-	var mps []ModuleMeasurePoint
+func parseModuleMeasurePoints(objmap []map[string]*json.RawMessage) []*ModuleMeasurePoint {
+	var mps []*ModuleMeasurePoint
 	for _, p := range objmap {
-		var bt uint64
+		var bt int64
 		if err := json.Unmarshal(*p["beg_time"], &bt); err != nil {
 			log.Printf("Error during unmarshal of beg_time: %v\n", err)
 			continue
@@ -140,20 +140,28 @@ func parseModuleMeasurePoints(objmap []map[string]*json.RawMessage) []ModuleMeas
 					var boff uint16
 					var t float64
 					var spt float64
-					if err := json.Unmarshal(*value[0], &bon); err != nil {
-						log.Printf("Error during unmarshal first value: %v\n", err)
+					if value[0] != nil {
+						if err := json.Unmarshal(*value[0], &bon); err != nil {
+							log.Printf("Error during unmarshal first value: %v\n", err)
+						}
 					}
-					if err := json.Unmarshal(*value[1], &boff); err != nil {
-						log.Printf("Error during unmarshal second value: %v\n", err)
+					if value[1] != nil {
+						if err := json.Unmarshal(*value[1], &boff); err != nil {
+							log.Printf("Error during unmarshal second value: %v\n", err)
+						}
 					}
-					if err := json.Unmarshal(*value[2], &t); err != nil {
-						log.Printf("Error during unmarshal third value: %v\n", err)
+					if value[2] != nil {
+						if err := json.Unmarshal(*value[2], &t); err != nil {
+							log.Printf("Error during unmarshal third value: %v\n", err)
+						}
 					}
-					if err := json.Unmarshal(*value[2], &spt); err != nil {
-						log.Printf("Error during unmarshal fourth value: %v\n", err)
+					if value[3] != nil {
+						if err := json.Unmarshal(*value[3], &spt); err != nil {
+							log.Printf("Error during unmarshal fourth value: %v\n", err)
+						}
 					}
-					pt := bt + (uint64(step) * uint64(i))
-					mp := ModuleMeasurePoint{
+					pt := bt + (int64(step) * int64(i))
+					mp := &ModuleMeasurePoint{
 						Time:                pt,
 						SumBoilerOn:         bon,
 						SumBoilerOff:        boff,

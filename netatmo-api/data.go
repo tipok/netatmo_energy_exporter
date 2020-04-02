@@ -1,15 +1,15 @@
 package netatmo_api
 
 type HomesData struct {
-	Homes []Home `json:"homes"`
+	Homes []*Home `json:"homes"`
 }
 
 type Homes struct {
-	Homes []Home `json:"homes"`
+	Homes []*Home `json:"homes"`
 }
 
 type HomeStatus struct {
-	Home Home `json:"home"`
+	Home *Home `json:"home"`
 }
 
 type Home struct {
@@ -18,8 +18,8 @@ type Home struct {
 	Id          string    `json:"id"`
 	Name        string    `json:"name"`
 	Coordinates []float64 `json:"coordinates"`
-	Modules     []Module  `json:"modules"`
-	Rooms       []Room    `json:"rooms"`
+	Modules     []*Module  `json:"modules"`
+	Rooms       []*Room    `json:"rooms"`
 }
 
 type Module struct {
@@ -28,10 +28,10 @@ type Module struct {
 	Type             string `json:"type"`
 	Bridge           string `json:"bridge"`
 	Anticipating     bool   `json:"anticipating"`
-	FirmwareRevision uint32 `json:"firmware_revision"`
-	RfStrength       uint32 `json:"rf_strength"`
-	WifiStrength     uint32 `json:"wifi_strength"`
-	BatteryLevel     uint32 `json:"battery_level"`
+	FirmwareRevision float64 `json:"firmware_revision"`
+	RfStrength       float64 `json:"rf_strength"`
+	WifiStrength     float64 `json:"wifi_strength"`
+	BatteryLevel     float64 `json:"battery_level"`
 	BatteryState     string `json:"battery_state"`
 	BoilerStatus     bool   `json:"boiler_status"`
 	RoomId           string `json:"room_id"`
@@ -51,11 +51,11 @@ type Room struct {
 }
 
 type ModuleMeasures struct {
-	Measures []ModuleMeasurePoint `json:"measures"`
+	Measures []*ModuleMeasurePoint `json:"measures"`
 }
 
 type ModuleMeasurePoint struct {
-	Time                uint64  `json:"time"`
+	Time                int64  `json:"time"`
 	SumBoilerOn         uint16  `json:"sum_boiler_on"`
 	SumBoilerOff        uint16  `json:"sum_boiler_off"`
 	MeasuredTemperature float64 `json:"therm_measured_temperature"`
@@ -167,10 +167,10 @@ func mergeRooms(h *Home, h2 *Home) {
 
 	h2rm := make(map[string]*Room)
 	for _, r := range h2.Rooms {
-		h2rm[r.Id] = &r
+		h2rm[r.Id] = r
 	}
 
-	var rooms []Room
+	var rooms []*Room
 	for _, r := range h.Rooms {
 		if r2, ok := h2rm[r.Id]; ok {
 			r.Merge(r2)
@@ -180,7 +180,7 @@ func mergeRooms(h *Home, h2 *Home) {
 	}
 
 	for _, r2 := range h2rm {
-		rooms = append(rooms, *r2)
+		rooms = append(rooms, r2)
 	}
 
 	h.Rooms = rooms
@@ -194,10 +194,10 @@ func mergeModules(h *Home, h2 *Home) {
 
 	h2mm := make(map[string]*Module)
 	for _, m := range h2.Modules {
-		h2mm[m.Id] = &m
+		h2mm[m.Id] = m
 	}
 
-	var modules []Module
+	var modules []*Module
 	for _, m := range h.Modules {
 		if m2, ok := h2mm[m.Id]; ok {
 			m.Merge(m2)
@@ -207,7 +207,7 @@ func mergeModules(h *Home, h2 *Home) {
 	}
 
 	for _, m2 := range h2mm {
-		modules = append(modules, *m2)
+		modules = append(modules, m2)
 	}
 
 	h.Modules = modules
