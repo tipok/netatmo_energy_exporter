@@ -25,10 +25,12 @@ func main() {
 	var clientSecret string
 	var username string
 	var password string
+	var listen string
 	flag.StringVar(&clientId, "client-id", "", "Netatmo API client ID")
 	flag.StringVar(&clientSecret, "client-secret", "", "Netatmo API client secret")
 	flag.StringVar(&username, "username", "", "Netatmo username")
 	flag.StringVar(&password, "password", "", "Netatmo password")
+	flag.StringVar(&listen, "listen", ":2112", "Address to listen on")
 	flag.Parse()
 
 	if clientId == "" {
@@ -74,7 +76,7 @@ func main() {
 	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server{
-		Addr:    ":2112",
+		Addr:    listen,
 		Handler: mux,
 	}
 
