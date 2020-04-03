@@ -21,14 +21,25 @@ const (
 	subsystem = ""
 )
 
-type metric struct {
+type home struct {
 	home     *netatmo.Home
 	module   *netatmo.Module
 	measures *netatmo.ModuleMeasures
 }
 
+type cache struct {
+	entries map[string]*cacheEntry
+}
+
+type cacheEntry struct {
+	home    *netatmo.Home
+	module  *netatmo.Module
+	measure *netatmo.ModuleMeasurePoint
+}
+
 type Collector struct {
 	client        *netatmo.Client
+	cache         *cache
 	up            prometheus.Gauge
 	fwRevision    *prometheus.Desc
 	boilerStatus  *prometheus.Desc
@@ -60,6 +71,7 @@ func newCollector(client *netatmo.Client) *Collector {
 
 	return &Collector{
 		client: client,
+		cache: &cache{entries: make(map[string]*cacheEntry)},
 		up: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "up",
@@ -146,60 +158,78 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 	now := time.Now()
 	if c.lastMeasure == nil {
-		d := time.Duration(-5) * time.Minute
+		d := time.Duration(-1) * time.Hour
 		from := now.Add(d)
 		c.lastMeasure = &from
 	}
 
-	metrics, err := collectModulesWithMeasures(c.client, *c.lastMeasure, now)
+	homes, err := collectModulesWithMeasures(c.client, *c.lastMeasure, now)
 	if err != nil {
 		log.Println(err)
 		c.up.Set(0)
 		ch <- c.up
 		return
 	}
-	c.lastMeasure = &now
 
 	c.up.Set(1)
 	ch <- c.up
 
-	for _, m := range metrics {
+	for _, h := range homes {
+		var ce *cacheEntry
+		if ce1, ok := c.cache.entries[h.home.Id]; ok {
+			ce = ce1
+		} else {
+			ce = &cacheEntry{}
+		}
+		ce.home = h.home
+		ce.module = h.module
+
+		c.cache.entries[h.home.Id] = ce
+		if h.measures == nil || len(h.measures.Measures) == 0 {
+			continue
+		}
+		c.lastMeasure = &now
+		c.cache.entries[h.home.Id].measure = h.measures.Measures[len(h.measures.Measures)-1]
+	}
+
+
+	for _, ce := range c.cache.entries {
 		labels := []string{
-			m.home.Id,
-			m.home.Name,
-			m.home.Country,
-			strconv.FormatUint(uint64(m.home.Altitude), 10),
-			strconv.FormatFloat(m.home.Coordinates[0], 'f', 8, 64),
-			strconv.FormatFloat(m.home.Coordinates[1], 'f', 8, 64),
-			m.module.RoomId,
-			m.module.Bridge,
-			m.module.Id,
-			m.module.Type,
+			ce.home.Id,
+			ce.home.Name,
+			ce.home.Country,
+			strconv.FormatUint(uint64(ce.home.Altitude), 10),
+			strconv.FormatFloat(ce.home.Coordinates[0], 'f', 8, 64),
+			strconv.FormatFloat(ce.home.Coordinates[1], 'f', 8, 64),
+			ce.module.RoomId,
+			ce.module.Bridge,
+			ce.module.Id,
+			ce.module.Type,
 		}
 
 		ch <- prometheus.MustNewConstMetric(
 			c.batteryLevel,
 			prometheus.GaugeValue,
-			m.module.BatteryLevel,
+			ce.module.BatteryLevel,
 			labels...,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.wifiStrength,
 			prometheus.GaugeValue,
-			m.module.WifiStrength,
+			ce.module.WifiStrength,
 			labels...,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.rfStrength,
 			prometheus.GaugeValue,
-			m.module.RfStrength,
+			ce.module.RfStrength,
 			labels...,
 		)
 
 		var boilerStatus float64 = 0
-		if m.module.BoilerStatus {
+		if ce.module.BoilerStatus {
 			boilerStatus = 1
 		}
 
@@ -208,11 +238,10 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.GaugeValue,
 			boilerStatus,
 			labels...,
-
 		)
 
 		var reachable float64 = 0
-		if m.module.Reachable {
+		if ce.module.Reachable {
 			reachable = 1
 		}
 
@@ -223,40 +252,34 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			labels...,
 		)
 
-		if m.measures == nil || len(m.measures.Measures) == 0 {
-			continue
-		}
-
-		mp := m.measures.Measures[len(m.measures.Measures)-1]
-
 		temp := prometheus.MustNewConstMetric(
 			c.temperature,
 			prometheus.GaugeValue,
-			mp.MeasuredTemperature,
+			ce.measure.MeasuredTemperature,
 			labels...,
 		)
 
 		spTemp := prometheus.MustNewConstMetric(
 			c.spTemperature,
 			prometheus.GaugeValue,
-			mp.SetPointTemperature,
+			ce.measure.SetPointTemperature,
 			labels...,
 		)
 
 		bon := prometheus.MustNewConstMetric(
 			c.sumBoilerOn,
 			prometheus.GaugeValue,
-			float64(mp.SumBoilerOn),
+			float64(ce.measure.SumBoilerOn),
 			labels...,
 		)
 
 		boff := prometheus.MustNewConstMetric(
 			c.sumBoilerOff,
 			prometheus.GaugeValue,
-			float64(mp.SumBoilerOff),
+			float64(ce.measure.SumBoilerOff),
 			labels...,
 		)
-		t := time.Unix(mp.Time, 0)
+		t := time.Unix(ce.measure.Time, 0)
 		ch <- prometheus.NewMetricWithTimestamp(t, temp)
 		ch <- prometheus.NewMetricWithTimestamp(t, spTemp)
 		ch <- prometheus.NewMetricWithTimestamp(t, bon)
@@ -264,8 +287,8 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func collectModulesWithMeasures(client *netatmo.Client, from time.Time, until time.Time) ([]*metric, error) {
-	var metrics []*metric
+func collectModulesWithMeasures(client *netatmo.Client, from time.Time, until time.Time) ([]*home, error) {
+	var metrics []*home
 	homes, err := client.GetHomes()
 	if err != nil {
 		return nil, err
@@ -276,7 +299,7 @@ func collectModulesWithMeasures(client *netatmo.Client, from time.Time, until ti
 			if err != nil {
 				log.Printf("Error getting info for module %v (%v): %v", m.Id, m.Type, err)
 			}
-			metrics = append(metrics, &metric{home: h, module: m, measures: measure})
+			metrics = append(metrics, &home{home: h, module: m, measures: measure})
 		}
 	}
 	return metrics, nil
