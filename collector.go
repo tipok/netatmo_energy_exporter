@@ -167,8 +167,9 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	ch <- c.up
 
 	for _, h := range homes {
+		cacheKey := h.home.Id
 		var ce *cacheEntry
-		if ce1, ok := c.cache.entries[h.home.Id]; ok {
+		if ce1, ok := c.cache.entries[cacheKey]; ok {
 			ce = ce1
 		} else {
 			ce = &cacheEntry{}
@@ -176,12 +177,12 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		ce.home = h.home
 		ce.module = h.module
 
-		c.cache.entries[h.home.Id] = ce
+		c.cache.entries[cacheKey] = ce
 		if h.measures == nil || len(h.measures.Measures) == 0 {
 			continue
 		}
 		c.lastMeasure = &now
-		c.cache.entries[h.home.Id].measure = h.measures.Measures[len(h.measures.Measures)-1]
+		c.cache.entries[cacheKey].measure = h.measures.Measures[len(h.measures.Measures)-1]
 	}
 
 
