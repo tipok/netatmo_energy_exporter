@@ -40,6 +40,7 @@ type Collector struct {
 	wifiStrength  *prometheus.Desc
 	rfStrength    *prometheus.Desc
 	batteryLevel  *prometheus.Desc
+	lastMeasure   *time.Time
 }
 
 func newCollector(client *netatmo.Client) *Collector {
@@ -142,13 +143,22 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-	metrics, err := collectModulesWithMeasures(c.client)
+
+	now := time.Now()
+	if c.lastMeasure == nil {
+		d := time.Duration(-5) * time.Minute
+		from := now.Add(d)
+		c.lastMeasure = &from
+	}
+
+	metrics, err := collectModulesWithMeasures(c.client, *c.lastMeasure, now)
 	if err != nil {
 		log.Println(err)
 		c.up.Set(0)
 		ch <- c.up
 		return
 	}
+	c.lastMeasure = &now
 
 	c.up.Set(1)
 	ch <- c.up
@@ -213,48 +223,48 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			labels...,
 		)
 
-		if m.measures == nil {
+		if m.measures == nil || len(m.measures.Measures) == 0 {
 			continue
 		}
 
-		for _, mp := range m.measures.Measures {
-			temp := prometheus.MustNewConstMetric(
-				c.temperature,
-				prometheus.GaugeValue,
-				mp.MeasuredTemperature,
-				labels...,
-			)
+		mp := m.measures.Measures[len(m.measures.Measures)-1]
 
-			spTemp := prometheus.MustNewConstMetric(
-				c.spTemperature,
-				prometheus.GaugeValue,
-				mp.SetPointTemperature,
-				labels...,
-			)
+		temp := prometheus.MustNewConstMetric(
+			c.temperature,
+			prometheus.GaugeValue,
+			mp.MeasuredTemperature,
+			labels...,
+		)
 
-			bon := prometheus.MustNewConstMetric(
-				c.sumBoilerOn,
-				prometheus.GaugeValue,
-				float64(mp.SumBoilerOn),
-				labels...,
-			)
+		spTemp := prometheus.MustNewConstMetric(
+			c.spTemperature,
+			prometheus.GaugeValue,
+			mp.SetPointTemperature,
+			labels...,
+		)
 
-			boff := prometheus.MustNewConstMetric(
-				c.sumBoilerOff,
-				prometheus.GaugeValue,
-				float64(mp.SumBoilerOff),
-				labels...,
-			)
-			t := time.Unix(mp.Time, 0)
-			ch <- prometheus.NewMetricWithTimestamp(t, temp)
-			ch <- prometheus.NewMetricWithTimestamp(t, spTemp)
-			ch <- prometheus.NewMetricWithTimestamp(t, bon)
-			ch <- prometheus.NewMetricWithTimestamp(t, boff)
-		}
+		bon := prometheus.MustNewConstMetric(
+			c.sumBoilerOn,
+			prometheus.GaugeValue,
+			float64(mp.SumBoilerOn),
+			labels...,
+		)
+
+		boff := prometheus.MustNewConstMetric(
+			c.sumBoilerOff,
+			prometheus.GaugeValue,
+			float64(mp.SumBoilerOff),
+			labels...,
+		)
+		t := time.Unix(mp.Time, 0)
+		ch <- prometheus.NewMetricWithTimestamp(t, temp)
+		ch <- prometheus.NewMetricWithTimestamp(t, spTemp)
+		ch <- prometheus.NewMetricWithTimestamp(t, bon)
+		ch <- prometheus.NewMetricWithTimestamp(t, boff)
 	}
 }
 
-func collectModulesWithMeasures(client *netatmo.Client) ([]*metric, error) {
+func collectModulesWithMeasures(client *netatmo.Client, from time.Time, until time.Time) ([]*metric, error) {
 	var metrics []*metric
 	homes, err := client.GetHomes()
 	if err != nil {
@@ -262,9 +272,9 @@ func collectModulesWithMeasures(client *netatmo.Client) ([]*metric, error) {
 	}
 	for _, h := range homes.Homes {
 		for _, m := range h.Modules {
-			measure, err := client.GetMeasure(m)
+			measure, err := client.GetMeasure(m, from, until)
 			if err != nil {
-				log.Printf("Error getting info for module %v (%v): %v", m.Id,  m.Type, err)
+				log.Printf("Error getting info for module %v (%v): %v", m.Id, m.Type, err)
 			}
 			metrics = append(metrics, &metric{home: h, module: m, measures: measure})
 		}

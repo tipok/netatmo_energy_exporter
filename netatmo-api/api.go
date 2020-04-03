@@ -2,6 +2,7 @@ package netatmo_api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -91,10 +92,18 @@ func (c *Client) getRoomMeasure(home string, room string) (interface{}, error) {
 	return v, nil
 }
 
-func (c *Client) GetMeasure(m *Module) (*ModuleMeasures, error) {
+func (c *Client) GetMeasure(m *Module, from time.Time, until time.Time) (*ModuleMeasures, error) {
 	measureUrl, err := url.Parse(measure.String())
 	if err != nil {
 		return nil, err
+	}
+
+	if m.Bridge == "" {
+		return nil, errors.New("only bridged modules can be used")
+	}
+
+	if m.Id == "" {
+		return nil, errors.New("module id has to be there")
 	}
 
 	q := measureUrl.Query()
@@ -103,10 +112,8 @@ func (c *Client) GetMeasure(m *Module) (*ModuleMeasures, error) {
 	q.Add("type", "sum_boiler_on,sum_boiler_off,temperature,sp_temperature")
 	q.Add("scale", "5min")
 	q.Add("real_time", "true")
-	now := time.Now()
-	d := time.Duration(-8) * time.Hour
-	q.Add("date_end", strconv.FormatInt(now.Unix(), 10))
-	q.Add("date_begin", strconv.FormatInt(now.Add(d).Unix(), 10))
+	q.Add("date_end", strconv.FormatInt(until.Unix(), 10))
+	q.Add("date_begin", strconv.FormatInt(from.Unix(), 10))
 	measureUrl.RawQuery = q.Encode()
 
 	var objmap []map[string]*json.RawMessage
