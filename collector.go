@@ -167,7 +167,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	ch <- c.up
 
 	for _, h := range homes {
-		cacheKey := h.home.Id
+		cacheKey := h.module.Id
 		var ce *cacheEntry
 		if ce1, ok := c.cache.entries[cacheKey]; ok {
 			ce = ce1
@@ -244,6 +244,10 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			reachable,
 			labels...,
 		)
+
+		if ce.measure == nil {
+			continue
+		}
 
 		temp := prometheus.MustNewConstMetric(
 			c.temperature,
