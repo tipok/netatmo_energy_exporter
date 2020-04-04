@@ -18,23 +18,23 @@ type Home struct {
 	Id          string    `json:"id"`
 	Name        string    `json:"name"`
 	Coordinates []float64 `json:"coordinates"`
-	Modules     []*Module  `json:"modules"`
-	Rooms       []*Room    `json:"rooms"`
+	Modules     []*Module `json:"modules"`
+	Rooms       []*Room   `json:"rooms"`
 }
 
 type Module struct {
-	Id               string `json:"id"`
-	Reachable        bool   `json:"reachable"`
-	Type             string `json:"type"`
-	Bridge           string `json:"bridge"`
-	Anticipating     bool   `json:"anticipating"`
+	Id               string  `json:"id"`
+	Reachable        bool    `json:"reachable"`
+	Type             string  `json:"type"`
+	Bridge           string  `json:"bridge"`
+	Anticipating     bool    `json:"anticipating"`
 	FirmwareRevision float64 `json:"firmware_revision"`
 	RfStrength       float64 `json:"rf_strength"`
 	WifiStrength     float64 `json:"wifi_strength"`
 	BatteryLevel     float64 `json:"battery_level"`
-	BatteryState     string `json:"battery_state"`
-	BoilerStatus     bool   `json:"boiler_status"`
-	RoomId           string `json:"room_id"`
+	BatteryState     string  `json:"battery_state"`
+	BoilerStatus     bool    `json:"boiler_status"`
+	RoomId           string  `json:"room_id"`
 }
 
 type Room struct {
@@ -55,7 +55,7 @@ type ModuleMeasures struct {
 }
 
 type ModuleMeasurePoint struct {
-	Time                int64  `json:"time"`
+	Time                int64   `json:"time"`
 	SumBoilerOn         uint16  `json:"sum_boiler_on"`
 	SumBoilerOff        uint16  `json:"sum_boiler_off"`
 	MeasuredTemperature float64 `json:"therm_measured_temperature"`
