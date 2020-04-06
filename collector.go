@@ -272,7 +272,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			ch <- prometheus.MustNewConstMetric(
-				c.reachableModule,
+				c.reachableRoom,
 				prometheus.GaugeValue,
 				reachable,
 				labelsRoom...,
