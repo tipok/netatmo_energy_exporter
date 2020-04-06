@@ -123,7 +123,7 @@ func newCollector(client *netatmo.Client) *Collector {
 		reachableRoom: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, subsystemRoom, "reachable"),
 			"Tells if the room is currently reachable",
-			varModuleLabels,
+			varLabels,
 			constLabels,
 		),
 
