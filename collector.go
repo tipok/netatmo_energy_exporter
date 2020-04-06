@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	namespace = "netatmo"
-	subsystem = ""
+	namespace       = "netatmo"
+	subsystemModule = "module"
+	subsystemRoom   = "room"
 )
 
 type home struct {
@@ -30,20 +31,21 @@ type cacheEntry struct {
 }
 
 type Collector struct {
-	client        *netatmo.Client
-	cache         *cache
-	up            prometheus.Gauge
-	fwRevision    *prometheus.Desc
-	boilerStatus  *prometheus.Desc
-	reachable     *prometheus.Desc
-	temperature   *prometheus.Desc
-	spTemperature *prometheus.Desc
-	sumBoilerOn   *prometheus.Desc
-	sumBoilerOff  *prometheus.Desc
-	wifiStrength  *prometheus.Desc
-	rfStrength    *prometheus.Desc
-	batteryLevel  *prometheus.Desc
-	lastMeasure   *time.Time
+	client          *netatmo.Client
+	cache           *cache
+	up              prometheus.Gauge
+	fwRevision      *prometheus.Desc
+	boilerStatus    *prometheus.Desc
+	reachableModule *prometheus.Desc
+	reachableRoom   *prometheus.Desc
+	temperature     *prometheus.Desc
+	spTemperature   *prometheus.Desc
+	sumBoilerOn     *prometheus.Desc
+	sumBoilerOff    *prometheus.Desc
+	wifiStrength    *prometheus.Desc
+	rfStrength      *prometheus.Desc
+	batteryLevel    *prometheus.Desc
+	lastMeasure     *time.Time
 }
 
 func newCollector(client *netatmo.Client) *Collector {
@@ -55,77 +57,86 @@ func newCollector(client *netatmo.Client) *Collector {
 		"home_lat",
 		"home_long",
 		"room_id",
+	}
+
+	varModuleLabels := append(
+		varLabels,
 		"bridge",
 		"module",
 		"type",
-	}
+	)
+
 	constLabels := prometheus.Labels{}
 
 	return &Collector{
 		client: client,
-		cache: &cache{entries: make(map[string]*cacheEntry)},
+		cache:  &cache{entries: make(map[string]*cacheEntry)},
+
 		up: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "up",
 			Help:      "Status of netatmo exporter",
 		}),
+
 		fwRevision: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "firmware_revision"),
+			prometheus.BuildFQName(namespace, subsystemModule, "firmware_revision"),
 			"Firmware revision of module",
-			varLabels,
+			varModuleLabels,
 			constLabels,
 		),
-		reachable: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "reachable"),
-			"Tells if the module is currently reachable",
-			varLabels,
-			constLabels,
-		),
+
 		boilerStatus: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "boiler_status"),
+			prometheus.BuildFQName(namespace, subsystemModule, "boiler_status"),
 			"Status of the boiler",
-			varLabels,
+			varModuleLabels,
 			constLabels,
 		),
-		temperature: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "temperature"),
-			"Measured Temperature",
-			varLabels,
-			constLabels,
-		),
-		spTemperature: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "sp_temperature"),
-			"Set Point Temperature",
-			varLabels,
-			constLabels,
-		),
+
 		wifiStrength: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "wifi_strength"),
+			prometheus.BuildFQName(namespace, subsystemModule, "wifi_strength"),
 			"WiFi signal strength",
-			varLabels,
+			varModuleLabels,
 			constLabels,
 		),
+
 		rfStrength: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "rf_strength"),
+			prometheus.BuildFQName(namespace, subsystemModule, "rf_strength"),
 			"Radio signal strength",
-			varLabels,
+			varModuleLabels,
 			constLabels,
 		),
+
 		batteryLevel: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "battery_level"),
+			prometheus.BuildFQName(namespace, subsystemModule, "battery_level"),
 			"Level of the battery",
+			varModuleLabels,
+			constLabels,
+		),
+
+		reachableModule: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystemModule, "reachable"),
+			"Tells if the module is currently reachable",
+			varModuleLabels,
+			constLabels,
+		),
+
+		reachableRoom: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystemRoom, "reachable"),
+			"Tells if the room is currently reachable",
+			varModuleLabels,
+			constLabels,
+		),
+
+		temperature: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystemRoom, "temperature"),
+			"Measured Temperature in a room",
 			varLabels,
 			constLabels,
 		),
-		sumBoilerOn: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "sum_boiler_on"),
-			"Summery of boiler being on over time",
-			varLabels,
-			constLabels,
-		),
-		sumBoilerOff: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "sum_boiler_off"),
-			"Summery of boiler being off over time",
+
+		spTemperature: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystemRoom, "sp_temperature"),
+			"Set Point Temperature of a room",
 			varLabels,
 			constLabels,
 		),
@@ -141,9 +152,8 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.rfStrength
 	ch <- c.wifiStrength
 	ch <- c.batteryLevel
-	ch <- c.reachable
-	ch <- c.sumBoilerOn
-	ch <- c.sumBoilerOff
+	ch <- c.reachableModule
+	ch <- c.reachableRoom
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
@@ -155,7 +165,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		c.lastMeasure = &from
 	}
 
-	homes, err := collectModulesWithMeasures(c.client, *c.lastMeasure, now)
+	homes, err := c.client.GetHomes()
 	if err != nil {
 		log.Println(err)
 		c.up.Set(0)
@@ -166,121 +176,108 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	c.up.Set(1)
 	ch <- c.up
 
-	for _, h := range homes {
-		cacheKey := h.module.Id
-		var ce *cacheEntry
-		if ce1, ok := c.cache.entries[cacheKey]; ok {
-			ce = ce1
-		} else {
-			ce = &cacheEntry{}
-		}
-		ce.home = h.home
-		ce.module = h.module
-
-		c.cache.entries[cacheKey] = ce
-		if h.measures == nil || len(h.measures.Measures) == 0 {
-			continue
-		}
-		c.lastMeasure = &now
-		c.cache.entries[cacheKey].measure = h.measures.Measures[len(h.measures.Measures)-1]
-	}
-
-
-	for _, ce := range c.cache.entries {
-		labels := []string{
-			ce.home.Id,
-			ce.home.Name,
-			ce.home.Country,
-			strconv.FormatUint(uint64(ce.home.Altitude), 10),
-			strconv.FormatFloat(ce.home.Coordinates[0], 'f', 8, 64),
-			strconv.FormatFloat(ce.home.Coordinates[1], 'f', 8, 64),
-			ce.module.RoomId,
-			ce.module.Bridge,
-			ce.module.Id,
-			ce.module.Type,
+	for _, home := range homes.Homes {
+		labelsHome := []string{
+			home.Id,
+			home.Name,
+			home.Country,
+			strconv.FormatUint(uint64(home.Altitude), 10),
+			strconv.FormatFloat(home.Coordinates[0], 'f', 8, 64),
+			strconv.FormatFloat(home.Coordinates[1], 'f', 8, 64),
 		}
 
-		ch <- prometheus.MustNewConstMetric(
-			c.batteryLevel,
-			prometheus.GaugeValue,
-			ce.module.BatteryLevel,
-			labels...,
-		)
+		for _, m := range home.Modules {
+			labelsModule := append(
+				labelsHome,
+				m.RoomId,
+				m.Bridge,
+				m.Id,
+				m.Type,
+			)
 
-		ch <- prometheus.MustNewConstMetric(
-			c.wifiStrength,
-			prometheus.GaugeValue,
-			ce.module.WifiStrength,
-			labels...,
-		)
+			ch <- prometheus.MustNewConstMetric(
+				c.batteryLevel,
+				prometheus.GaugeValue,
+				m.BatteryLevel,
+				labelsModule...,
+			)
 
-		ch <- prometheus.MustNewConstMetric(
-			c.rfStrength,
-			prometheus.GaugeValue,
-			ce.module.RfStrength,
-			labels...,
-		)
+			ch <- prometheus.MustNewConstMetric(
+				c.wifiStrength,
+				prometheus.GaugeValue,
+				m.WifiStrength,
+				labelsModule...,
+			)
 
-		var boilerStatus float64 = 0
-		if ce.module.BoilerStatus {
-			boilerStatus = 1
+			ch <- prometheus.MustNewConstMetric(
+				c.rfStrength,
+				prometheus.GaugeValue,
+				m.RfStrength,
+				labelsModule...,
+			)
+
+			var boilerStatus float64 = 0
+			if m.BoilerStatus {
+				boilerStatus = 1
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				c.boilerStatus,
+				prometheus.GaugeValue,
+				boilerStatus,
+				labelsModule...,
+			)
+
+			var reachable float64 = 0
+			if m.Reachable {
+				reachable = 1
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				c.reachableModule,
+				prometheus.GaugeValue,
+				reachable,
+				labelsModule...,
+			)
 		}
 
-		ch <- prometheus.MustNewConstMetric(
-			c.boilerStatus,
-			prometheus.GaugeValue,
-			boilerStatus,
-			labels...,
-		)
+		for _, room := range home.Rooms {
+			labelsRoom := []string{
+				home.Id,
+				home.Name,
+				home.Country,
+				strconv.FormatUint(uint64(home.Altitude), 10),
+				strconv.FormatFloat(home.Coordinates[0], 'f', 8, 64),
+				strconv.FormatFloat(home.Coordinates[1], 'f', 8, 64),
+				room.Id,
+			}
 
-		var reachable float64 = 0
-		if ce.module.Reachable {
-			reachable = 1
+			ch <- prometheus.MustNewConstMetric(
+				c.temperature,
+				prometheus.GaugeValue,
+				room.MeasuredTemperature,
+				labelsRoom...,
+			)
+
+			ch <- prometheus.MustNewConstMetric(
+				c.spTemperature,
+				prometheus.GaugeValue,
+				room.SetPointTemperature,
+				labelsRoom...,
+			)
+
+			var reachable float64 = 0
+			if room.Reachable {
+				reachable = 1
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				c.reachableModule,
+				prometheus.GaugeValue,
+				reachable,
+				labelsRoom...,
+			)
 		}
-
-		ch <- prometheus.MustNewConstMetric(
-			c.reachable,
-			prometheus.GaugeValue,
-			reachable,
-			labels...,
-		)
-
-		if ce.measure == nil {
-			continue
-		}
-
-		temp := prometheus.MustNewConstMetric(
-			c.temperature,
-			prometheus.GaugeValue,
-			ce.measure.MeasuredTemperature,
-			labels...,
-		)
-
-		spTemp := prometheus.MustNewConstMetric(
-			c.spTemperature,
-			prometheus.GaugeValue,
-			ce.measure.SetPointTemperature,
-			labels...,
-		)
-
-		bon := prometheus.MustNewConstMetric(
-			c.sumBoilerOn,
-			prometheus.GaugeValue,
-			float64(ce.measure.SumBoilerOn),
-			labels...,
-		)
-
-		boff := prometheus.MustNewConstMetric(
-			c.sumBoilerOff,
-			prometheus.GaugeValue,
-			float64(ce.measure.SumBoilerOff),
-			labels...,
-		)
-		t := time.Unix(ce.measure.Time, 0)
-		ch <- prometheus.NewMetricWithTimestamp(t, temp)
-		ch <- prometheus.NewMetricWithTimestamp(t, spTemp)
-		ch <- prometheus.NewMetricWithTimestamp(t, bon)
-		ch <- prometheus.NewMetricWithTimestamp(t, boff)
 	}
 }
 
@@ -292,11 +289,7 @@ func collectModulesWithMeasures(client *netatmo.Client, from time.Time, until ti
 	}
 	for _, h := range homes.Homes {
 		for _, m := range h.Modules {
-			measure, err := client.GetMeasure(m, from, until)
-			if err != nil {
-				log.Printf("Error getting info for module %v (%v): %v", m.Id, m.Type, err)
-			}
-			metrics = append(metrics, &home{home: h, module: m, measures: measure})
+			metrics = append(metrics, &home{home: h, module: m, measures: nil})
 		}
 	}
 	return metrics, nil
