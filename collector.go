@@ -45,6 +45,7 @@ type Collector struct {
 	wifiStrength    *prometheus.Desc
 	rfStrength      *prometheus.Desc
 	batteryLevel    *prometheus.Desc
+	openWindow      *prometheus.Desc
 	lastMeasure     *time.Time
 }
 
@@ -127,6 +128,13 @@ func newCollector(client *netatmo.Client) *Collector {
 			constLabels,
 		),
 
+		openWindow: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystemRoom, "open_window"),
+			"Tells if the window is open.",
+			varLabels,
+			constLabels,
+		),
+
 		temperature: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, subsystemRoom, "temperature"),
 			"Measured Temperature in a room",
@@ -154,6 +162,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.batteryLevel
 	ch <- c.reachableModule
 	ch <- c.reachableRoom
+	ch <- c.openWindow
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
@@ -275,6 +284,18 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 				c.reachableRoom,
 				prometheus.GaugeValue,
 				reachable,
+				labelsRoom...,
+			)
+
+			var openWindow float64 = 0
+			if room.OpenWindow {
+				openWindow = 1
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				c.openWindow,
+				prometheus.GaugeValue,
+				openWindow,
 				labelsRoom...,
 			)
 		}
