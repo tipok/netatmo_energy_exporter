@@ -29,8 +29,11 @@ docker build -t netatmo_energy_exporter .
 ### Supported CLI Arguments
 
 --client-id :: netatmo APP client id [*required*]
---client-secret :: netatmo APP client secret [*required*]
---username :: netatmo username [*required*]
---password :: netatmo password [*required*]
---listen :: address in default go format to listen to (default _0.0.0.0:2112_) [*optional*] 
 
+--client-secret :: netatmo APP client secret [*required*]
+
+--username :: netatmo username [*required*]
+
+--password :: netatmo password [*required*]
+
+--listen :: address in default go format to listen to (default _0.0.0.0:2112_) [*optional*] 
