@@ -14,7 +14,7 @@ on:
   pull_request:
 
 env:
-  IMAGE_NAME: netatmo_exporter
+  IMAGE_NAME: netatmo_energy_exporter
 
 jobs:
   # Run tests.
