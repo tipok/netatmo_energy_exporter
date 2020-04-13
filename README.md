@@ -3,10 +3,13 @@
 This Prometheus exporter works with the netatmo energy API.
 It reads the current temperature measurement and set point temperature
 and exports it in prometheus readable way alongside with other metrics.
+This exporter publishes metrics per room and per modules.
+
+*IMPORTANT*: this exporter works only with netatmo Thermostats and Valves.
 
 ## Build Docker Image
 
-Best way to deploy is by creating a docker image by executing:
+The best way to deploy is by creating a docker image by executing:
 
 ```shell
 docker build -t netatmo_energy_exporter .
