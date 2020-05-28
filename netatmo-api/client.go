@@ -88,7 +88,7 @@ func (c *Client) request(req *http.Request, v interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error during http request: %w", err)
 	}
-	defer closeBody(res)
+	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusOK:
