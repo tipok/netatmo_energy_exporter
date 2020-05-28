@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/prometheus/common/version"
 	"log"
 	"net/http"
 	"os"
@@ -11,11 +12,13 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/version"
-
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 )
+
+func init() {
+	prometheus.MustRegister(version.NewCollector("netatmo_exporter"))
+}
 
 func main() {
 	var clientID string
@@ -45,8 +48,6 @@ func main() {
 	if password == "" {
 		log.Fatal("Netatmo password has to be provided.")
 	}
-
-	prometheus.MustRegister(version.NewCollector("netatmo_exporter"))
 
 	cnf := &netatmo.Config{
 		ClientID:     clientID,
