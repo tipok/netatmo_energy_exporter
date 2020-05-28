@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"net/http"
 	"os"
@@ -11,29 +10,27 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/version"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 )
 
-func init() {
-	prometheus.MustRegister(version.NewCollector("netatmo_exporter"))
-}
-
 func main() {
-	var clientId string
+	var clientID string
 	var clientSecret string
 	var username string
 	var password string
 	var listen string
-	flag.StringVar(&clientId, "client-id", "", "Netatmo API client ID")
+	flag.StringVar(&clientID, "client-id", "", "Netatmo API client ID")
 	flag.StringVar(&clientSecret, "client-secret", "", "Netatmo API client secret")
 	flag.StringVar(&username, "username", "", "Netatmo username")
 	flag.StringVar(&password, "password", "", "Netatmo password")
 	flag.StringVar(&listen, "listen", ":2112", "Address to listen on")
 	flag.Parse()
 
-	if clientId == "" {
+	if clientID == "" {
 		log.Fatal("Netatmo API client ID has to be provided.")
 	}
 
@@ -49,8 +46,10 @@ func main() {
 		log.Fatal("Netatmo password has to be provided.")
 	}
 
+	prometheus.MustRegister(version.NewCollector("netatmo_exporter"))
+
 	cnf := &netatmo.Config{
-		ClientID:     clientId,
+		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Username:     username,
 		Password:     password,
@@ -92,6 +91,6 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal(err)
+		log.Printf("Error during shutdown: %v", err)
 	}
 }

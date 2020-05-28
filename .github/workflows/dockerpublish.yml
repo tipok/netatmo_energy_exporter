@@ -62,13 +62,14 @@ jobs:
         with:
           # Can pass --config flag to change golangci-lint behavior and target
           # directory.
+          fail_on_error: true
           golangci_lint_flags: "--config=.github/.golangci.yml ."
 
   # Push image to GitHub Packages.
   # See also https://docs.docker.com/docker-hub/builds/
   push:
     # Ensure test job passes before pushing image.
-    needs: test
+    needs: [test, golangci-lint]
 
     runs-on: ubuntu-latest
     if: github.event_name == 'push'

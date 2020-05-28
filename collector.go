@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 )
 
 const (
@@ -14,25 +15,8 @@ const (
 	subsystemRoom   = "room"
 )
 
-type home struct {
-	home     *netatmo.Home
-	module   *netatmo.Module
-	measures *netatmo.ModuleMeasures
-}
-
-type cache struct {
-	entries map[string]*cacheEntry
-}
-
-type cacheEntry struct {
-	home    *netatmo.Home
-	module  *netatmo.Module
-	measure *netatmo.ModuleMeasurePoint
-}
-
 type Collector struct {
 	client          *netatmo.Client
-	cache           *cache
 	up              prometheus.Gauge
 	fwRevision      *prometheus.Desc
 	boilerStatus    *prometheus.Desc
@@ -40,8 +24,6 @@ type Collector struct {
 	reachableRoom   *prometheus.Desc
 	temperature     *prometheus.Desc
 	spTemperature   *prometheus.Desc
-	sumBoilerOn     *prometheus.Desc
-	sumBoilerOff    *prometheus.Desc
 	wifiStrength    *prometheus.Desc
 	rfStrength      *prometheus.Desc
 	batteryLevel    *prometheus.Desc
@@ -71,7 +53,6 @@ func newCollector(client *netatmo.Client) *Collector {
 
 	return &Collector{
 		client: client,
-		cache:  &cache{entries: make(map[string]*cacheEntry)},
 
 		up: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -166,7 +147,6 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-
 	now := time.Now()
 	if c.lastMeasure == nil {
 		d := time.Duration(-1) * time.Hour
@@ -250,68 +230,58 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			)
 		}
 
-		for _, room := range home.Rooms {
-			labelsRoom := []string{
-				home.Id,
-				home.Name,
-				home.Country,
-				strconv.FormatUint(uint64(home.Altitude), 10),
-				strconv.FormatFloat(home.Coordinates[0], 'f', 8, 64),
-				strconv.FormatFloat(home.Coordinates[1], 'f', 8, 64),
-				room.Id,
-			}
-
-			ch <- prometheus.MustNewConstMetric(
-				c.temperature,
-				prometheus.GaugeValue,
-				room.MeasuredTemperature,
-				labelsRoom...,
-			)
-
-			ch <- prometheus.MustNewConstMetric(
-				c.spTemperature,
-				prometheus.GaugeValue,
-				room.SetPointTemperature,
-				labelsRoom...,
-			)
-
-			var reachable float64 = 0
-			if room.Reachable {
-				reachable = 1
-			}
-
-			ch <- prometheus.MustNewConstMetric(
-				c.reachableRoom,
-				prometheus.GaugeValue,
-				reachable,
-				labelsRoom...,
-			)
-
-			var openWindow float64 = 0
-			if room.OpenWindow {
-				openWindow = 1
-			}
-
-			ch <- prometheus.MustNewConstMetric(
-				c.openWindow,
-				prometheus.GaugeValue,
-				openWindow,
-				labelsRoom...,
-			)
-		}
+		c.collectRooms(ch, home)
 	}
 }
 
-func collectModulesWithMeasures(client *netatmo.Client, from time.Time, until time.Time) ([]*home, error) {
-	var metrics []*home
-	homes, err := client.GetHomes()
-	if err != nil {
-		return nil, err
-	}
-	for _, h := range homes.Homes {
-		for _, m := range h.Modules {
-			metrics = append(metrics, &home{home: h, module: m, measures: nil})
+func (c *Collector) collectRooms(ch chan<- prometheus.Metric, home *netatmo.Home) {
+	for _, room := range home.Rooms {
+		labelsRoom := []string{
+			home.Id,
+			home.Name,
+			home.Country,
+			strconv.FormatUint(uint64(home.Altitude), 10),
+			strconv.FormatFloat(home.Coordinates[0], 'f', 8, 64),
+			strconv.FormatFloat(home.Coordinates[1], 'f', 8, 64),
+			room.Id,
 		}
+
+		ch <- prometheus.MustNewConstMetric(
+			c.temperature,
+			prometheus.GaugeValue,
+			room.MeasuredTemperature,
+			labelsRoom...,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.spTemperature,
+			prometheus.GaugeValue,
+			room.SetPointTemperature,
+			labelsRoom...,
+		)
+
+		var reachable float64 = 0
+		if room.Reachable {
+			reachable = 1
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			c.reachableRoom,
+			prometheus.GaugeValue,
+			reachable,
+			labelsRoom...,
+		)
+
+		var openWindow float64 = 0
+		if room.OpenWindow {
+			openWindow = 1
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			c.openWindow,
+			prometheus.GaugeValue,
+			openWindow,
+			labelsRoom...,
+		)
 	}
-	return metrics, nil
 }
