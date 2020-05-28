@@ -18,19 +18,19 @@ import (
 )
 
 func main() {
-	var clientId string
+	var clientID string
 	var clientSecret string
 	var username string
 	var password string
 	var listen string
-	flag.StringVar(&clientId, "client-id", "", "Netatmo API client ID")
+	flag.StringVar(&clientID, "client-id", "", "Netatmo API client ID")
 	flag.StringVar(&clientSecret, "client-secret", "", "Netatmo API client secret")
 	flag.StringVar(&username, "username", "", "Netatmo username")
 	flag.StringVar(&password, "password", "", "Netatmo password")
 	flag.StringVar(&listen, "listen", ":2112", "Address to listen on")
 	flag.Parse()
 
-	if clientId == "" {
+	if clientID == "" {
 		log.Fatal("Netatmo API client ID has to be provided.")
 	}
 
@@ -49,7 +49,7 @@ func main() {
 	prometheus.MustRegister(version.NewCollector("netatmo_exporter"))
 
 	cnf := &netatmo.Config{
-		ClientID:     clientId,
+		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Username:     username,
 		Password:     password,
