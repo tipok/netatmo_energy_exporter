@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 )
 
 const (
@@ -23,8 +24,6 @@ type Collector struct {
 	reachableRoom   *prometheus.Desc
 	temperature     *prometheus.Desc
 	spTemperature   *prometheus.Desc
-	sumBoilerOn     *prometheus.Desc
-	sumBoilerOff    *prometheus.Desc
 	wifiStrength    *prometheus.Desc
 	rfStrength      *prometheus.Desc
 	batteryLevel    *prometheus.Desc
@@ -148,7 +147,6 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-
 	now := time.Now()
 	if c.lastMeasure == nil {
 		d := time.Duration(-1) * time.Hour

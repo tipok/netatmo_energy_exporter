@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/version"
 	"log"
 	"net/http"
 	"os"
@@ -12,10 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/version"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	netatmo "github.com/tipok/netatmo_exporter/netatmo-api"
 )
-
 
 func main() {
 	var clientId string
