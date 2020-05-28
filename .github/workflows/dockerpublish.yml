@@ -62,6 +62,7 @@ jobs:
         with:
           # Can pass --config flag to change golangci-lint behavior and target
           # directory.
+          fail_on_error: true
           golangci_lint_flags: "--config=.github/.golangci.yml ."
 
   # Push image to GitHub Packages.
