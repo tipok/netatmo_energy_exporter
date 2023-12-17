@@ -21,6 +21,7 @@ const (
 type Config struct {
 	Username     string
 	Password     string
+	RefreshToken string
 	ClientID     string
 	ClientSecret string
 	Scopes       []string
@@ -46,6 +47,18 @@ func NewClient(ctx context.Context, cnf *Config) (*Client, error) {
 	}, nil
 }
 
+func getOauthToken(ctx context.Context, oauth *oauth2.Config, cnf *Config) (*oauth2.Token, error) {
+	if cnf.RefreshToken == "" {
+		token, err := oauth.PasswordCredentialsToken(ctx, cnf.Username, cnf.Password)
+		if err != nil {
+			return nil, fmt.Errorf("could not get token for %v: %w", cnf.Username, err)
+		}
+		return token, nil
+	}
+	return &oauth2.Token{RefreshToken: cnf.RefreshToken}, nil
+
+}
+
 func getOauthClient(ctx context.Context, cnf *Config) (*http.Client, error) {
 	oauth := &oauth2.Config{
 		ClientID:     cnf.ClientID,
@@ -57,11 +70,10 @@ func getOauthClient(ctx context.Context, cnf *Config) (*http.Client, error) {
 		},
 	}
 
-	token, err := oauth.PasswordCredentialsToken(ctx, cnf.Username, cnf.Password)
+	token, err := getOauthToken(ctx, oauth, cnf)
 	if err != nil {
-		return nil, fmt.Errorf("could not get token for %v: %w", cnf.Username, err)
+		return nil, err
 	}
-
 	httpClient := oauth.Client(ctx, token)
 
 	return httpClient, nil

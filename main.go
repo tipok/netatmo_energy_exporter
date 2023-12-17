@@ -23,10 +23,12 @@ func main() {
 	var username string
 	var password string
 	var listen string
+	var refreshToken string
 	flag.StringVar(&clientID, "client-id", "", "Netatmo API client ID")
 	flag.StringVar(&clientSecret, "client-secret", "", "Netatmo API client secret")
 	flag.StringVar(&username, "username", "", "Netatmo username")
 	flag.StringVar(&password, "password", "", "Netatmo password")
+	flag.StringVar(&refreshToken, "refresh-token", "", "Netatmo refresh-token")
 	flag.StringVar(&listen, "listen", ":2112", "Address to listen on")
 	flag.Parse()
 
@@ -38,11 +40,16 @@ func main() {
 		log.Fatal("Netatmo API client secret has to be provided.")
 	}
 
-	if username == "" {
+	refreshTokenUsed := false
+	if refreshToken != "" {
+		refreshTokenUsed = true
+	}
+
+	if username == "" && !refreshTokenUsed {
 		log.Fatal("Netatmo username has to be provided.")
 	}
 
-	if password == "" {
+	if password == "" && !refreshTokenUsed {
 		log.Fatal("Netatmo password has to be provided.")
 	}
 
@@ -53,6 +60,7 @@ func main() {
 		ClientSecret: clientSecret,
 		Username:     username,
 		Password:     password,
+		RefreshToken: refreshToken,
 		Scopes:       []string{netatmo.ReadStation, netatmo.ReadThermostat},
 	}
 	client, err := netatmo.NewClient(context.Background(), cnf)

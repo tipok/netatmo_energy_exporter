@@ -19,12 +19,27 @@ docker build -t netatmo_energy_exporter .
 
 1. First of all create an App in netatmos developers portal
 2. Generate and copy the client id and secret
+   * if you're going to use the refresh token, generate one and copy it
 3. Run by executing:
     ```shell script
     docker run -d -p 2112:2112 netatmo_energy_exporter \
        --client-id=${CLIENT_ID} --client-secret=${CLIENT_SECRET} \
        --username=${USERNAME} --password=${PASSWORD}
     ```
+   or
+   ```shell script
+   docker run -d -p 2112:2112 netatmo_energy_exporter \
+      --client-id=${CLIENT_ID} --client-secret=${CLIENT_SECRET} \
+      --refrehs-token=${REFRESH_TOKEN}
+   ```
+   
+### Using refresh token
+
+Netatmo has deprecated the ability to use the password credential flow, even though it's still listed.
+If you're experiencing any issues while using your username + password combination, try to get the 
+refresh token. You should use the following scopes while generating the token:
+- read_station
+- read_thermostat
 
 ### Supported CLI Arguments
 
@@ -36,4 +51,6 @@ docker build -t netatmo_energy_exporter .
 
 --password :: netatmo password [*required*]
 
---listen :: address in default go format to listen to (default _0.0.0.0:2112_) [*optional*] 
+--refresh-token :: netatmo refresh token [*required*]
+
+--listen :: address in default go format to listen to (default _0.0.0.0:2112_) [*optional*]
