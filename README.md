@@ -30,7 +30,7 @@ docker build -t netatmo_energy_exporter .
    ```shell script
    docker run -d -p 2112:2112 netatmo_energy_exporter \
       --client-id=${CLIENT_ID} --client-secret=${CLIENT_SECRET} \
-      --refrehs-token=${REFRESH_TOKEN}
+      --refresh-token=${REFRESH_TOKEN}
    ```
    
 ### Using refresh token
